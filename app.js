@@ -255,7 +255,7 @@ const App = (() => {
       tooltip.innerHTML = `
         <div class="tt-time">${d.timestamp}</div>
         <div class="tt-text">${d.full_text || d.text}</div>
-        <div class="tt-subtext">${d.subtext || ''}</div>
+        ${getHighlightHtml(d, 'tt-subtext')}
         <div class="tt-tags">${(d.themes || []).map(t => `<span class="tt-tag">${t}</span>`).join('')}<span class="tt-tag">${d.emotion}</span></div>`;
       tooltip.classList.add('visible');
       let x = event.clientX + 14, y = event.clientY - 14;
@@ -288,10 +288,15 @@ const App = (() => {
     const neighbors = node.neighbors || [];
     const cl = clusters[node.cluster] || { keywords: [] };
 
+    // Helper
+    const useAI = analysisResult.meta.useAI;
+    const highlightLabel = useAI ? '潜台词' : '核心词';
+    const highlightValue = useAI ? (node.subtext || '') : (node.tfidf_keywords || []).join(' · ');
+
     document.getElementById('detailContent').innerHTML = `
       <h3>${node.timestamp}</h3>
       <div class="note-text">${node.full_text || node.text}</div>
-      <div class="meta-item"><span class="meta-label">潜台词</span><span class="meta-value accent-text">${node.subtext || ''}</span></div>
+      ${highlightValue ? `<div class="meta-item"><span class="meta-label">${highlightLabel}</span><span class="meta-value accent-text">${highlightValue}</span></div>` : ''}
       <div class="meta-item"><span class="meta-label">主题</span><span class="meta-value">${(node.themes || []).join(' · ')}</span></div>
       <div class="meta-item"><span class="meta-label">情绪</span><span class="meta-value">${node.emotion}</span></div>
       <div class="meta-item"><span class="meta-label">类型</span><span class="meta-value">${node.note_type}</span></div>
@@ -327,7 +332,7 @@ const App = (() => {
         <div class="timeline-card" data-id="${n.id}" style="border-left-color:${CLUSTER_COLORS[n.cluster % CLUSTER_COLORS.length]}">
           <div class="tc-time">${n.timestamp} · ${n.note_type}</div>
           <div class="tc-text">${n.full_text || n.text}</div>
-          <div class="tc-subtext">${n.subtext || ''}</div>
+          ${getHighlightHtml(n, 'tc-subtext')}
           <div class="tc-tags">${(n.themes || []).map(t => `<span class="tc-tag">${t}</span>`).join('')}<span class="tc-tag">${n.emotion}</span></div>
         </div>`).join('')}</div></div>`).join('');
 
@@ -351,7 +356,7 @@ const App = (() => {
         return `<div class="bridge-card">
           <h3>${node.timestamp} · 连接 ${b.bridges_to_clusters.length} 个簇</h3>
           <div class="bridge-text">${node.full_text || node.text}</div>
-          <div class="bridge-subtext">${node.subtext || ''}</div>
+          ${getHighlightHtml(node, 'bridge-subtext')}
           <div class="bridge-connections">
             <span class="bridge-conn" style="border-left:3px solid ${CLUSTER_COLORS[b.cluster % CLUSTER_COLORS.length]}">所在: ${cl.keywords.slice(0, 3).join('·')}</span>
             ${b.bridges_to_clusters.map(cid => {
@@ -422,12 +427,26 @@ const App = (() => {
       if (activeFilters.themes.size) vis = vis && (d.themes || []).some(t => activeFilters.themes.has(t));
       if (activeFilters.emotions.size) vis = vis && activeFilters.emotions.has(d.emotion);
       if (activeFilters.types.size) vis = vis && activeFilters.types.has(d.note_type);
-      if (activeFilters.search) vis = vis && ((d.full_text || d.text).toLowerCase().includes(activeFilters.search) || (d.subtext || '').toLowerCase().includes(activeFilters.search));
+      if (activeFilters.search) {
+        const textToSearch = (d.full_text || d.text) + ' ' + (d.subtext || '') + ' ' + (d.tfidf_keywords || []).join(' ');
+        vis = vis && textToSearch.toLowerCase().includes(activeFilters.search);
+      }
       d3.select(this).style('opacity', vis ? 1 : 0.06);
     });
   }
 
   // ─── 启动 ──────────────────────────────────────────────
+  
+  function getHighlightHtml(node, className) {
+    if (!analysisResult) return '';
+    if (analysisResult.meta.useAI && node.subtext) {
+      return `<div class="${className}">${node.subtext}</div>`;
+    } else if (!analysisResult.meta.useAI && node.tfidf_keywords && node.tfidf_keywords.length) {
+      return `<div class="${className}">核心词: ${node.tfidf_keywords.join(' · ')}</div>`;
+    }
+    return '';
+  }
+
   document.addEventListener('DOMContentLoaded', init);
 
   return { showDetail };

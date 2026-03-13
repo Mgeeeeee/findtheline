@@ -141,40 +141,13 @@ const Analyzer = (() => {
       if (/此间/.test(tag)) { noteType = '日常此间'; break; }
     }
 
-    // Subtext
-    const subtext = generateSubtext(note, themes, emotion);
+    // Subtext (removed hardcoded generation)
+    const subtext = '';
 
     return { themes: themes.slice(0, 3), emotion, note_type: noteType, subtext };
   }
 
-  function generateSubtext(note, themes, emotion) {
-    const text = note.full_text || note.text || '';
-    const len = text.length;
 
-    if (themes.includes('AI与人的关系') && themes.includes('自我认知'))
-      return '在与AI的对话中，其实是在和自己对话';
-    if (themes.includes('逃避与面对'))
-      return '知道应该面对，但逃避的惯性仍在';
-    if (themes.includes('时间与存在'))
-      return '时间流逝带来的不只是焦虑，还有某种清醒';
-    if (themes.includes('成长与变化'))
-      return '想要改变的信号，已经在字里行间';
-    if (themes.includes('AI与人的关系'))
-      return '对AI的思考，映射的是对自身处境的感受';
-    if (themes.includes('自我认知'))
-      return '在反复确认自己是谁的过程中';
-    if (themes.includes('梦境'))
-      return '梦境是潜意识的加密信件';
-    if (themes.includes('记录与反思'))
-      return '记录本身就是一种不甘心遗忘的抵抗';
-    if (emotion === '焦虑' || emotion === '迷茫')
-      return '不确定性带来的不安，同时也是可能性的入口';
-    if (emotion === '平静' || emotion === '释然')
-      return '暂时的平静，或许是真正想通了的起点';
-    if (len < 20)
-      return '短小的记录，藏着不想展开的心事';
-    return '看似随笔，实则是某个时刻的情绪切片';
-  }
 
   // ─── 3. Gemini API 标注（有 API 模式）─────────────────────
 
@@ -358,20 +331,29 @@ ${batchTexts}
     const vocabSize = candidates.length;
 
     // Compute TF-IDF vectors
-    const vectors = docs.map(tokens => {
+    const vectors = docs.map((tokens, i) => {
       const vec = new Float64Array(vocabSize);
       const tf = {};
       tokens.forEach(t => { if (vocab[t] !== undefined) tf[t] = (tf[t] || 0) + 1; });
+      
+      const wordScores = [];
       for (const [word, count] of Object.entries(tf)) {
         const idx = vocab[word];
         const idf = Math.log(N / (df[word] || 1));
-        vec[idx] = (count / tokens.length) * idf;
+        const val = (count / tokens.length) * idf;
+        vec[idx] = val;
+        wordScores.push({ word, val });
       }
+      
+      // Store top 3 TF-IDF keywords on the note
+      wordScores.sort((a, b) => b.val - a.val);
+      notes[i].tfidf_keywords = wordScores.slice(0, 3).map(x => x.word);
+      
       // L2 normalize
       let norm = 0;
-      for (let i = 0; i < vocabSize; i++) norm += vec[i] * vec[i];
+      for (let j = 0; j < vocabSize; j++) norm += vec[j] * vec[j];
       norm = Math.sqrt(norm) || 1;
-      for (let i = 0; i < vocabSize; i++) vec[i] /= norm;
+      for (let j = 0; j < vocabSize; j++) vec[j] /= norm;
       return vec;
     });
 
