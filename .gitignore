@@ -26,3 +26,6 @@ __pycache__/
 
 # Node (if ever needed)
 node_modules/
+
+# Local Docs
+HANDOFF.md
