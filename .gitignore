@@ -1,0 +1,28 @@
+# Personal data - NEVER commit
+*.html.bak
+notes_*.json
+cache/
+*.npy
+
+# Flomo exports
+Mgeeeeee*
+*的笔记*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python (legacy scripts)
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Node (if ever needed)
+node_modules/
