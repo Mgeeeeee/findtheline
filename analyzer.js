@@ -418,9 +418,15 @@ ${batchTexts}
         if (usedIdx.has(i)) { dists[i] = 0; continue; }
         let minDist = Infinity;
         for (const cent of centroids) {
-          let d = 0;
-          for (let j = 0; j < dim; j++) d += (vectors[i][j] - cent[j]) ** 2;
-          minDist = Math.min(minDist, d);
+          let dot = 0;
+          let normC = 0;
+          for (let j = 0; j < dim; j++) {
+            dot += vectors[i][j] * cent[j];
+            normC += cent[j] * cent[j];
+          }
+          normC = Math.sqrt(normC) || 1;
+          let d = 1 - (dot / normC);
+          minDist = Math.min(minDist, Math.max(0, d));
         }
         dists[i] = minDist;
         total += minDist;
@@ -441,8 +447,14 @@ ${batchTexts}
       for (let i = 0; i < n; i++) {
         let bestC = 0, bestDist = Infinity;
         for (let c = 0; c < k; c++) {
-          let d = 0;
-          for (let j = 0; j < dim; j++) d += (vectors[i][j] - centroids[c][j]) ** 2;
+          let dot = 0;
+          let normC = 0;
+          for (let j = 0; j < dim; j++) {
+            dot += vectors[i][j] * centroids[c][j];
+            normC += centroids[c][j] * centroids[c][j];
+          }
+          normC = Math.sqrt(normC) || 1;
+          let d = 1 - (dot / normC);
           if (d < bestDist) { bestDist = d; bestC = c; }
         }
         if (labels[i] !== bestC) { labels[i] = bestC; changed = true; }
@@ -493,9 +505,9 @@ ${batchTexts}
       if (myMembers.length > 1) {
         for (const j of myMembers) {
           if (j === i) continue;
-          let d = 0;
-          for (let k = 0; k < dim; k++) d += (vectors[i][k] - vectors[j][k]) ** 2;
-          a += Math.sqrt(d);
+          let dot = 0;
+          for (let k = 0; k < dim; k++) dot += vectors[i][k] * vectors[j][k];
+          a += Math.max(0, 1 - dot);
         }
         a /= (myMembers.length - 1);
       }
@@ -506,9 +518,9 @@ ${batchTexts}
         if (parseInt(cl) === myCluster) continue;
         let avgDist = 0;
         for (const j of members) {
-          let d = 0;
-          for (let k = 0; k < dim; k++) d += (vectors[i][k] - vectors[j][k]) ** 2;
-          avgDist += Math.sqrt(d);
+          let dot = 0;
+          for (let k = 0; k < dim; k++) dot += vectors[i][k] * vectors[j][k];
+          avgDist += Math.max(0, 1 - dot);
         }
         avgDist /= members.length;
         b = Math.min(b, avgDist);
