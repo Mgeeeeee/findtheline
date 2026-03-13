@@ -139,12 +139,16 @@ const Analyzer = (() => {
       const batch = notes.slice(i, i + batchSize);
       const batchTexts = batch.map((n, idx) => `[${idx}] ${n.full_text || n.text}`).join('\n---\n');
 
+      const allowedThemes = Object.keys(THEME_KEYWORDS).join('、');
+      const allowedEmotions = Object.keys(EMOTION_KEYWORDS).join('、');
+      const allowedTypes = Object.keys(NOTE_TYPE_PATTERNS).join('、');
+
       const prompt = `你是一个专业的笔记与心智分析引擎。请对以下${batch.length}条笔记进行多维深度语义分析。
-每条笔记需要提取并返回四个维度的信息，请完全根据笔记内容进行**动态生成**，不要受限于任何预设列表：
-- themes: 根据内容提取最合适的主题标签（1-3个），每个标签不超过6个字。
-- emotion: 这段文字散发的核心情绪基调（1个），不超过4个字。
-- note_type: 笔记的体裁或属性（1个），不超过6个字。
-- subtext: 这条笔记没有明说的潜台词、心理动机或深层含义是什么（一句话，15-25字）。
+每条笔记需要提取并返回四个维度的信息：
+- themes: 根据内容提取最合适的主题标签（1-3个），必须并且只能从以下列表中选择：${allowedThemes}。
+- emotion: 这段文字散发的核心情绪基调（1个），必须并且只能从以下列表中选择：${allowedEmotions}。
+- note_type: 笔记的体裁或属性（1个），必须并且只能从以下列表中选择：${allowedTypes}。
+- subtext: 这条笔记没有明说的潜台词、心理动机或深层含义是什么（动态生成一句话，15-25字）。
 
 笔记内容：
 ${batchTexts}
