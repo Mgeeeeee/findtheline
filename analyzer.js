@@ -152,7 +152,7 @@ const Analyzer = (() => {
   // ─── 3. Gemini API 标注（有 API 模式）─────────────────────
 
   async function annotateWithGemini(notes, apiKey, onProgress) {
-    const batchSize = 8;
+    const batchSize = 40;
     const results = new Array(notes.length);
     let completed = 0;
 
@@ -170,57 +170,79 @@ const Analyzer = (() => {
 笔记内容：
 ${batchTexts}
 
-请返回JSON数组，每个元素对应一条笔记，格式：
+务必返回包含 ${batch.length} 个元素的 JSON 数组，每个元素对应一条笔记，格式：
 [{"themes":["..."],"emotion":"...","note_type":"...","subtext":"..."}]
-只返回JSON，不要其他内容。`;
+只返回严格的 JSON，不要 Markdown 格式。`;
 
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.3,
-              },
-            }),
+      let success = false;
+      let retries = 3;
+
+      while (!success && retries > 0) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  temperature: 0.3,
+                },
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 429) {
+              console.warn('Gemini Rate limit (429). Waiting 5s...');
+              await new Promise(r => setTimeout(r, 5000));
+              retries--;
+              continue; // Retry
+            }
+            const err = await response.text();
+            throw new Error(`API error ${response.status}: ${err}`);
           }
-        );
 
-        if (!response.ok) {
-          const err = await response.text();
-          throw new Error(`API error ${response.status}: ${err}`);
+          const data = await response.json();
+          let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+          
+          text = text.replace(/^```json/i, '').replace(/```$/i, '').trim();
+          const parsed = JSON.parse(text);
+
+          batch.forEach((note, idx) => {
+            const ann = parsed[idx] || {};
+            results[i + idx] = {
+              themes: Array.isArray(ann.themes) ? ann.themes.slice(0, 3) : ['日常随想'],
+              emotion: ann.emotion || '沉思',
+              note_type: ann.note_type || '生活感悟',
+              subtext: ann.subtext || '',
+            };
+          });
+          
+          success = true;
+        } catch (e) {
+          console.warn(`Gemini batch ${i} try failed:`, e);
+          retries--;
+          if (retries > 0) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
         }
+      }
 
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-        const parsed = JSON.parse(text);
-
-        batch.forEach((note, idx) => {
-          const ann = parsed[idx] || {};
-          results[i + idx] = {
-            themes: ann.themes || ['日常随想'],
-            emotion: ann.emotion || '沉思',
-            note_type: ann.note_type || '生活感悟',
-            subtext: ann.subtext || '看似随笔，实则是某个时刻的情绪切片',
-          };
-        });
-      } catch (e) {
-        console.warn(`Gemini batch ${i} failed, falling back to keyword:`, e);
+      if (!success) {
+        console.warn(`Gemini batch ${i} completely failed, falling back to keyword.`);
         batch.forEach((note, idx) => {
           results[i + idx] = annotateKeyword(note);
         });
       }
 
       completed += batch.length;
-      onProgress?.(`AI 标注中… ${Math.min(completed, notes.length)}/${notes.length}`);
+      onProgress?.(`AI 标注中… ${Math.min(completed, notes.length)}/${notes.length} (由于 API 频率限制，处理会稍慢请耐心)`);
 
-      // Rate limiting: ~200ms between batches
       if (i + batchSize < notes.length) {
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 4000));
       }
     }
 
