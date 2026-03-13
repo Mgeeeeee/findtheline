@@ -159,7 +159,7 @@ ${batchTexts}
       while (!success && retries > 0) {
         try {
           const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -239,14 +239,14 @@ ${batchTexts}
     for (let i = 0; i < notes.length; i += batchSize) {
       const batch = notes.slice(i, i + batchSize);
       const requests = batch.map(n => ({
-        model: 'models/gemini-embedding-001',
+        model: 'models/text-embedding-004',
         content: { parts: [{ text: (n.full_text || n.text).substring(0, 2000) }] },
         taskType: 'CLUSTERING',
       }));
 
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
